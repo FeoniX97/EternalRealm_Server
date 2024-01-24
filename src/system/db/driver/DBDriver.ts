@@ -5,4 +5,6 @@ export interface DBDriver {
   insertOne(json: any): Promise<string>;
 
   updateOne(docID: string, json: any): Promise<void>;
+
+  findOne(docID: string): Promise<any>
 }

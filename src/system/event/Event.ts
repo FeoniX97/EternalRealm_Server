@@ -16,7 +16,7 @@ export default abstract class Event {
    * send this event object to all listeners of this event sender\
    * returns `true` if this event is blocked
    */
-  protected sendEventBefore(): boolean {
+  sendEventBefore(): boolean {
     for (let eventListener of this.sender.eventListeners) {
       if (!this.blocked) eventListener.onEventBefore(this);
     }
@@ -24,7 +24,7 @@ export default abstract class Event {
     return this.blocked;
   }
 
-  protected sendEventAfter(): void {
+  sendEventAfter(): void {
     for (let eventListener of this.sender.eventListeners) {
       if (!this.blocked) eventListener.onEventAfter(this);
     }

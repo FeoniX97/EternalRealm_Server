@@ -33,4 +33,8 @@ export default abstract class MongoDBDriver implements DBDriver {
       .collection(this.collectionStr)
       .updateOne({ _id: new ObjectId(docID) }, { $set: json });
   }
+
+  async findOne(docID: string): Promise<any> {
+    return await this.db.collection(this.collectionStr).findOne({ _id: new ObjectId(docID) })
+  }
 }
