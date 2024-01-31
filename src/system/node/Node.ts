@@ -69,7 +69,7 @@ export default abstract class Node implements EventSender, EventListener {
     this.populate(data);
   }
 
-  /** the downstream data is ready, implement this method to create children, hook events etc... */
+  /** the downstream data is ready, implement this method to set data, create children, hook events etc... */
   abstract onPopulate(data: any): void;
 
   getNodeID() {

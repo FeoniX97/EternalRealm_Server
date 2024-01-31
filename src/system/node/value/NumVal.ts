@@ -1,25 +1,28 @@
-import Event from "../../event/Event";
 import Node from "../Node";
-import Value, { ValueOptions } from "./Value";
+import Value, { ValChangeEvent, ValData, ValueOptions } from "./Value";
 
 export interface NumValOptions extends ValueOptions {
   /** whether this value is integer, default to `false` */
-  isInt: boolean;
+  isInt?: boolean;
 
   /** whether this value allows negative, default to `false` */
-  allowNegative: boolean;
+  allowNegative?: boolean;
+}
+
+export interface NumValData extends ValData {
+  value?: number;
 }
 
 export default class NumVal extends Value {
   protected value: number;
 
   /** whether this value is integer, default to `false` */
-  private readonly isInt: boolean;
+  protected readonly isInt: boolean;
 
   /** whether this value allows negative, default to `false` */
-  private readonly allowNegative: boolean;
+  protected readonly allowNegative: boolean;
 
-  constructor(parent: Node, options: NumValOptions, data: any) {
+  constructor(parent: Node, options: NumValOptions, data: NumValData) {
     super(parent, options, data);
 
     this.isInt = options.isInt !== null ? options.isInt : false;
@@ -28,31 +31,32 @@ export default class NumVal extends Value {
 
   setValue(value: number): void {
     if (this.isInt) value = Math.round(value);
-    if (!this.allowNegative && value < 0) throw new Error("value does not allow negative: " + this.nodeID);
+    if (!this.allowNegative && value < 0) value = 0;
 
     let evt = new NumValChangeEvent(this, this.value, value);
-    
+
     if (evt.sendEventBefore()) return;
-  
+
     super.setValue(evt.after);
 
     evt.sendEventAfter();
   }
 
-  onPopulate(data: any): void {
+  getValue(): number {
+    return this.value;
+  }
+
+  onPopulate(data: NumValData): void {
     this.value = data?.value !== null ? data?.value : 0;
   }
 }
 
-export class NumValChangeEvent extends Event {
+export class NumValChangeEvent extends ValChangeEvent {
   readonly before: number;
   after: number;
 
   constructor(sender: NumVal, before: number, after: number) {
-    super(sender);
-
-    this.before = before;
-    this.after = after;
+    super(sender, before, after);
   }
 
   diff() {
