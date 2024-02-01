@@ -4,38 +4,35 @@ import { Delayed } from "colyseus";
 
 export const DB_TIMEOUT = 5000;
 
-export interface ObjOptions extends NodeOptions {
-  /** the id of this Obj in the DB, `dbCollection` also need to set for proper persistance storage  */
-  dbID?: string;
-
-  /** the collection name of this Obj in the DB, `dbID` also need to set for proper persistance storage */
-  dbCollection?: string;
-}
+export interface ObjOptions extends NodeOptions {}
 
 /** persistent Root Node which can be stored in DB */
 export default abstract class Obj extends Node {
-  /** the id of this Obj in the DB, `dbCollection` also need to set for proper persistance storage  */
-  protected dbID?: string;
-
-  /** the collection name of this Obj in the DB, `dbID` also need to set for proper persistance storage */
-  protected dbCollection?: string;
-
   /** the promise to wait when calling `isPopulated()` */
   private populatedPromise: Promise<void>;
 
   /** the timeout left to update DB by calling `saveDB()` */
   private dbTimeout?: Delayed;
 
-  constructor(parent: Node, options: ObjOptions, data: any) {
-    super(parent, options, data);
+  /** the data pending to update to DB, to be used by `saveDB()` */
+  private dbUpdatePendingData?: any;
 
-    this.dbID = options.dbID;
-    this.dbCollection = options.dbCollection;
+  getDbTimeout() {
+    return this.dbTimeout;
+  }
+
+  /** to be called by primitive Value Nodes whenever they have data that needs to be updated to DB */
+  addDbUpdateData(field: string, data: any) {
+    if (!this.dbUpdatePendingData) this.dbUpdatePendingData = {};
+
+    this.dbUpdatePendingData[field] = data;
+
+    if (!this.dbTimeout) this.saveDB();
   }
 
   /** @override
    * populate the Node with downstream data, or data from DB document */
-  protected async populate(data: any) {
+  protected async populate(data: any, options: ObjOptions) {
     this.populatedPromise = new Promise(async (resolve, reject) => {
       // get data specifically for this Node
       data = data?.[this.nodeID];
@@ -51,7 +48,7 @@ export default abstract class Obj extends Node {
       }
 
       // start creating child nodes and hook events
-      this.onPopulate(dbData ?? data);
+      this.onPopulate(dbData ?? data, options);
 
       // insert this Obj to DB if does not exist yet
       if (!this.dbID) {
@@ -73,9 +70,28 @@ export default abstract class Obj extends Node {
     return super.toData();
   }
 
+  /** save the Obj data to DB */
+  private async saveDB() {
+    // return if a DB timeout is already in progress
+    if (this.dbTimeout) return;
+
+    // return if theres no pending data to update
+    if (!this.dbUpdatePendingData) return;
+
+    // ensure the Obj is first populated finish
+    await this.isPopulated();
+
+    this.dbTimeout = this.getClock().setTimeout(async () => {
+      await db.collection(this.dbCollection).updateOne(this.dbID, this.dbUpdatePendingData);
+      this.dbTimeout?.clear();
+      this.dbTimeout = null;
+      this.dbUpdatePendingData = null;
+    }, DB_TIMEOUT);
+  }
+
   /** @override
    * convert this Node to a JSON data format, with DB document reference */
-  protected toData(): { dbID: string, dbCollection: string, clsName: string } {
+  toData(): { dbID: string, dbCollection: string, clsName: string } {
     return {
       dbID: this.dbID,
       dbCollection: this.dbCollection,
@@ -88,20 +104,5 @@ export default abstract class Obj extends Node {
    */
   async isPopulated() {
     return this.populatedPromise;
-  }
-
-  /** save the Obj data to DB */
-  async saveDB() {
-    // return if a DB timeout is already in progress
-    if (this.dbTimeout) return;
-
-    // ensure the Obj is first populated finish
-    await this.isPopulated();
-
-    this.dbTimeout = this.getClock().setTimeout(async () => {
-      await db.collection(this.dbCollection).updateOne(this.dbID, this.toData());
-      this.dbTimeout?.clear();
-      this.dbTimeout = null;
-    }, DB_TIMEOUT);
   }
 }

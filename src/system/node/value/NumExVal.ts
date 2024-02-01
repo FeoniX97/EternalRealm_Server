@@ -1,7 +1,8 @@
+import { Options } from '@colyseus/loadtest';
 import Node from "../Node";
-import NumVal, { NumValData, NumValOptions } from "./NumVal";
+import NumVal, { NumValOptions } from "./NumVal";
 
-export interface NumExValData extends NumValData {
+export interface NumExValOptions extends NumValOptions {
   increaseRate?: number;
   incrementRate?: number;
 }
@@ -12,7 +13,7 @@ export default class NumExVal extends NumVal {
 
   private incrementRate = .0;
 
-  constructor(parent: Node, options: NumValOptions, data: NumExValData) {
+  constructor(parent: Node, options: NumExValOptions, data: any) {
     super(parent, options, data);
   }
 
@@ -41,14 +42,14 @@ export default class NumExVal extends NumVal {
     return result;
   }
 
-  onPopulate(data: NumExValData): void {
-    super.onPopulate(data);
+  onPopulate(data: any, options: NumExValOptions): void {
+    super.onPopulate(data, options);
 
-    this.increaseRate = data?.increaseRate ?? .0;
-    this.incrementRate = data?.incrementRate ?? .0;
+    this.increaseRate = data?.increaseRate ?? (options?.increaseRate ?? .0);
+    this.incrementRate = data?.incrementRate ?? (options?.incrementRate ?? .0);
   }
 
-  protected toData() {
+  toData() {
     return {
       ...super.toData(),
       increaseRate: this.increaseRate,

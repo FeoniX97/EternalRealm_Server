@@ -13,10 +13,12 @@ export default abstract class Event {
   }
 
   /**
-   * send this event object to all listeners of this event sender\
-   * returns `true` if this event is blocked
-   */
+  * send this event object to all listeners of this event sender\
+  * returns `true` if this event is blocked
+  */
   sendEventBefore(): boolean {
+    if (this.sender.eventDisabled) return;
+
     for (let eventListener of this.sender.eventListeners) {
       if (!this.blocked) eventListener.onEventBefore(this);
     }
@@ -25,6 +27,8 @@ export default abstract class Event {
   }
 
   sendEventAfter(): void {
+    if (this.sender.eventDisabled) return;
+
     for (let eventListener of this.sender.eventListeners) {
       if (!this.blocked) eventListener.onEventAfter(this);
     }

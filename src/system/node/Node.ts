@@ -10,12 +10,6 @@ export interface NodeOptions {
   /** helps for debugging when identifying the correct Node */
   tag?: string;
 
-  /** whether parent is a Root Node
-   * @NOTE Root Nodes do not forget to pass this option to created children\
-   * @NOTE Root Nodes can be children of another Node
-   */
-  fromRoot?: boolean;
-
   /** the room clock of Colyseus */
   clock?: Clock;
 
@@ -24,10 +18,19 @@ export interface NodeOptions {
 
   /** the callback to listen when the Node is populated finish */
   onPopulated?: <T extends Node>(self: T) => void;
+
+  /** the id of this Obj in the DB, `dbCollection` also need to set for proper persistance storage  */
+  dbID?: string;
+
+  /** the collection name of this Obj in the DB, `dbID` also need to set for proper persistance storage */
+  dbCollection?: string;
 }
 
 export default abstract class Node implements EventSender, EventListener {
-  eventListeners: EventListener[];
+  eventListeners: EventListener[] = [];
+
+  /** whether the sending of event feature is disabled */
+  eventDisabled: boolean;
 
   /** helps for debugging when identifying the correct Node */
   tag?: string;
@@ -48,6 +51,12 @@ export default abstract class Node implements EventSender, EventListener {
   /** the unique name in each Node which is the field in DB and to receive action from client */
   protected nodeID: string | number;
 
+  /** the id of this Obj in the DB, `dbCollection` also need to set for proper persistance storage  */
+  protected dbID?: string;
+
+  /** the collection name of this Obj in the DB, `dbID` also need to set for proper persistance storage */
+  protected dbCollection?: string;
+
   private parent: Node;
 
   /** the room clock of Colyseus */
@@ -60,17 +69,20 @@ export default abstract class Node implements EventSender, EventListener {
     this.tag = options.tag;
     this.clock = options.clock;
     this.clsName = options.clsName ?? this.constructor.name;
-    this.root = options.fromRoot ? parent : parent.root;
+    this.root = parent?.getDbCollection() ? parent : parent?.root;
 
     this.parent?.children.push(this);
     this.parent?.hookEvent(this);
 
+    this.dbID = options.dbID;
+    this.dbCollection = options.dbCollection;
+
     this.populatedCallback = options.onPopulated;
-    this.populate(data);
+    this.populate(data, options);
   }
 
   /** the downstream data is ready, implement this method to set data, create children, hook events etc... */
-  abstract onPopulate(data: any): void;
+  protected abstract onPopulate(data: any, options: NodeOptions): void;
 
   getNodeID() {
     return this.nodeID;
@@ -86,6 +98,14 @@ export default abstract class Node implements EventSender, EventListener {
 
   getClock() {
     return this.clock;
+  }
+
+  getDbCollection() {
+    return this.dbCollection;
+  }
+
+  getDbID() {
+    return this.dbID;
   }
 
   hookEvent(...eventSenders: EventSender[]): void {
@@ -123,16 +143,25 @@ export default abstract class Node implements EventSender, EventListener {
     }
   }
 
+  /** returns the merged nodeID joined by parents, used to update value in DB */
+  onMergeNodeID(): string {
+    // return "" if reached the Obj
+    if (this.dbCollection) return "";
+
+    let parentNodeID = this.parent?.onMergeNodeID();
+    return (parentNodeID ? parentNodeID + "." : "") + this.nodeID;
+  }
+
   /** populate the Node with downstream data */
-  protected populate(data: any) {
+  protected populate(data: any, options: NodeOptions) {
     // get data specifically for this Node
     data = data?.[this.nodeID];
 
-    this.onPopulate(data);
+    this.onPopulate(data, options);
   }
 
   /** convert this Node to a JSON data format, with full data combined by children */
-  protected toData(): any {
+  toData(): any {
     let data: any = {};
 
     if (this.clsName) data.clsName = this.clsName;
